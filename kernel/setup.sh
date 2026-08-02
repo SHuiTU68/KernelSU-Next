@@ -2,7 +2,7 @@
 set -eu
 
 GKI_ROOT=$(pwd)
-OWNER="pershoot"
+OWNER="SHuiTU68"
 REPO="KernelSU-Next"
 
 display_usage() {
@@ -54,7 +54,7 @@ setup_kernelsu() {
 
     git pull && echo "[+] Repository updated."
     if [ -z "${1-}" ]; then
-        git checkout "$(git describe --abbrev=0 --tags)" && echo "[-] Checked out latest tag."
+        git checkout "dev-KF" && echo "[-] Checked out dev-KF branch."
     else
         git checkout "$1" && echo "[-] Checked out $1." || echo "[-] Checkout default branch"
     fi
