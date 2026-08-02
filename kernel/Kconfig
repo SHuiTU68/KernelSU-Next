@@ -53,18 +53,20 @@ config KSU_X86_PATCH_SYSCALL_DISPATCHER
 	  Dynamically patch x64's hardened syscall dispatcher to support syscall hooks. This is a
 	  replacement for a kernel source code patch, and is useful for x86_64 LKM mode.
 
-config KSU_KPROBE_HOOK
-	bool "Kprobe-based kernel function hook framework"
+config KSU_KFPROBE_HOOK
+	bool "KFprobe: kernel function probe hook engine"
 	depends on KSU && KPROBES
 	default n
 	help
-	  Enable the kprobe-based hook framework for intercepting kernel VFS/core
-	  functions (e.g. do_execveat_common, do_faccessat, vfs_statx).
-	  This provides an alternative hook mechanism that is independent of the
-	  syscall table patching and tracepoint approach.
-	  Uses static key + per-task filter to minimise runtime overhead when no
-	  hooks are active, and supports address-based kprobe registration to
-	  reduce the kprobes detection surface in /proc/kallsyms.
+	  KFprobe (Kernel Function Probe) is a hybrid kprobe/kretprobe hook
+	  engine for intercepting kernel VFS/core functions (e.g.
+	  do_execveat_common, do_faccessat, vfs_statx).
+	  Features:
+	    - Address-based kprobe registration (no /proc/kallsyms leak)
+	    - Three-layer static-key gate (global + per-feature + per-task)
+	    - Optional kretprobe for return-value interception
+	    - Root-powered symbol resolution via kallsyms_lookup_name
+	    - Zero hot-path allocations, zero hot-path logging
 	  If unsure, say N.
 
 menu "KernelSU - SUSFS"

@@ -21,7 +21,7 @@
 #include "infra/file_wrapper.h"
 #include "selinux/selinux.h"
 #include "hook/syscall_hook.h"
-#include "hook/kprobe_hook.h"
+#include "hook/kfprobe_hook.h"
 #include "feature/adb_root.h"
 #include "feature/selinux_hide.h"
 #include "feature/sulog.h"
@@ -155,8 +155,8 @@ int __init kernelsu_init(void)
 #endif
 #endif
 
-#ifdef CONFIG_KSU_KPROBE_HOOK
-	ksu_kprobe_hook_init();
+#ifdef CONFIG_KSU_KFPROBE_HOOK
+	ksu_kfprobe_hook_init();
 #endif
 
 	ksu_selinux_hide_init();
@@ -265,8 +265,8 @@ void __exit kernelsu_exit(void)
 #endif
 #endif
 
-#ifdef CONFIG_KSU_KPROBE_HOOK
-	ksu_kprobe_hook_exit();
+#ifdef CONFIG_KSU_KFPROBE_HOOK
+	ksu_kfprobe_hook_exit();
 #endif
 
 	ksu_adb_root_exit();
