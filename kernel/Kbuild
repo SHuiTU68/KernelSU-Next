@@ -13,7 +13,9 @@ endif
 # Core utilities ('selinux hide'/hooks)
 ifeq ($(strip $(CONFIG_KPROBES)),y)
 kernelsu-objs += hook/lsm_hook.o
+ifeq ($(strip $(CONFIG_KSU_KPROBE_HOOK)),y)
 kernelsu-objs += hook/kprobe_hook.o
+endif
 ifdef KSU_ARCH
 kernelsu-objs += hook/$(KSU_ARCH)/patch_memory.o
 endif

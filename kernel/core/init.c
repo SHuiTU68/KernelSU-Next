@@ -155,7 +155,7 @@ int __init kernelsu_init(void)
 #endif
 #endif
 
-#ifdef CONFIG_KPROBES
+#ifdef CONFIG_KSU_KPROBE_HOOK
 	ksu_kprobe_hook_init();
 #endif
 
@@ -265,7 +265,7 @@ void __exit kernelsu_exit(void)
 #endif
 #endif
 
-#ifdef CONFIG_KPROBES
+#ifdef CONFIG_KSU_KPROBE_HOOK
 	ksu_kprobe_hook_exit();
 #endif
 

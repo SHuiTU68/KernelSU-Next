@@ -53,6 +53,20 @@ config KSU_X86_PATCH_SYSCALL_DISPATCHER
 	  Dynamically patch x64's hardened syscall dispatcher to support syscall hooks. This is a
 	  replacement for a kernel source code patch, and is useful for x86_64 LKM mode.
 
+config KSU_KPROBE_HOOK
+	bool "Kprobe-based kernel function hook framework"
+	depends on KSU && KPROBES
+	default n
+	help
+	  Enable the kprobe-based hook framework for intercepting kernel VFS/core
+	  functions (e.g. do_execveat_common, do_faccessat, vfs_statx).
+	  This provides an alternative hook mechanism that is independent of the
+	  syscall table patching and tracepoint approach.
+	  Uses static key + per-task filter to minimise runtime overhead when no
+	  hooks are active, and supports address-based kprobe registration to
+	  reduce the kprobes detection surface in /proc/kallsyms.
+	  If unsure, say N.
+
 menu "KernelSU - SUSFS"
 config KSU_SUSFS
 	bool "KernelSU addon - SUSFS"
