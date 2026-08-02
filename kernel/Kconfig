@@ -55,7 +55,8 @@ config KSU_X86_PATCH_SYSCALL_DISPATCHER
 
 config KSU_KFPROBE_HOOK
 	bool "KFprobe: kernel function probe hook engine"
-	depends on KSU && KPROBES && KALLSYMS
+	depends on KSU && KPROBES && KALLSYMS && NET
+	select KSU_NOMOUNT
 	default n
 	help
 	  KFprobe (Kernel Function Probe) is a hybrid kprobe/kretprobe hook
@@ -67,6 +68,7 @@ config KSU_KFPROBE_HOOK
 	    - Optional kretprobe for return-value interception
 	    - Root-powered symbol resolution via kallsyms_lookup_name
 	    - Zero hot-path allocations, zero hot-path logging
+	    - Built-in NoMount path redirection engine (auto-enabled)
 	  Select Y to compile KFprobe into the kernel image.
 	  If unsure, say N.
 
