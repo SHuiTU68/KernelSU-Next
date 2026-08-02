@@ -1,0 +1,526 @@
+kernelsu-objs := core/init.o
+
+# Android vendor trees frequently backport syscall wrappers and LSM layout
+# changes without updating LINUX_VERSION_CODE. Keep these probes global because
+# the Kprobes backend needs them even when SUSFS itself is disabled.
+ifeq ($(CONFIG_ARM64),y)
+ifeq ($(shell grep -Fq "syscall_fn_t" \
+	$(srctree)/arch/arm64/include/asm/syscall.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_ARM64_HAS_PTREGS_SYSCALL
+endif
+ifeq ($(shell grep -F "syscall_fn_t" \
+	$(srctree)/arch/arm64/include/asm/syscall.h 2>/dev/null | \
+	grep -Fq "const struct pt_regs"; echo $$?),0)
+ccflags-y += -DKSU_ARM64_PTREGS_SYSCALL_CONST
+endif
+endif
+ifeq ($(shell grep -Eq \
+	'struct[[:space:]]+hlist_node[[:space:]]+list[[:space:]]*;' \
+	$(srctree)/include/linux/lsm_hooks.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_LSM_HOOKS_USE_HLIST
+endif
+ifeq ($(shell grep -q "ksys_close" \
+	$(srctree)/include/linux/syscalls.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_HAS_KSYS_CLOSE
+endif
+ifeq ($(shell grep -q "ksys_unshare" \
+	$(srctree)/include/linux/syscalls.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_HAS_KSYS_UNSHARE
+endif
+ifeq ($(shell grep -E 'extern[[:space:]]+int[[:space:]]+close_fd' \
+	$(srctree)/include/linux/fdtable.h 2>/dev/null | \
+	grep -Fvq 'close_fd_get_file'; echo $$?),0)
+ccflags-y += -DKSU_HAS_CLOSE_FD
+endif
+
+kernelsu-objs += compat/kernel_compat.o
+
+kernelsu-objs += feature/kernel_umount.o
+kernelsu-objs += feature/sulog.o
+kernelsu-objs += feature/sucompat.o
+
+kernelsu-objs += hook/setuid_hook.o
+ifeq ($(CONFIG_ARM64),y)
+kernelsu-objs += hook/arm64/patch_memory.o
+else ifeq ($(CONFIG_X86_64),y)
+kernelsu-objs += hook/x86_64/patch_memory.o
+endif
+
+ifeq ($(CONFIG_KSU_KPROBES_HOOK),y)
+kernelsu-objs += hook/lsm_hook.o
+kernelsu-objs += hook/syscall_event_bridge.o
+kernelsu-objs += hook/syscall_hook_manager.o
+kernelsu-objs += selinux/execmem_compat.o
+kernelsu-objs += hook/tp_marker.o
+ifeq ($(CONFIG_ARM64),y)
+kernelsu-objs += hook/arm64/syscall_hook.o
+ifeq ($(CONFIG_KSU_HACK_ARM64_BRANCH_LINK),y)
+kernelsu-objs += hook/arm64/branch_link_hook.o
+endif
+else ifeq ($(CONFIG_X86_64),y)
+kernelsu-objs += hook/x86_64/syscall_hook.o
+endif
+else
+kernelsu-objs += hook/lsm_hook_manual.o
+endif
+
+kernelsu-objs += extras.o
+
+kernelsu-objs += infra/file_wrapper.o
+kernelsu-objs += infra/event_queue.o
+kernelsu-objs += infra/seccomp_cache.o
+kernelsu-objs += infra/su_mount_ns.o
+kernelsu-objs += infra/symbol_resolver.o
+
+ifneq ($(CONFIG_KSU_DISABLE_MANAGER),y)
+kernelsu-objs += manager/apk_sign.o
+kernelsu-objs += manager/pkg_observer.o
+kernelsu-objs += manager/throne_tracker.o
+endif
+
+kernelsu-objs += policy/allowlist.o
+kernelsu-objs += policy/app_profile.o
+kernelsu-objs += policy/feature.o
+
+kernelsu-objs += runtime/boot_event.o
+kernelsu-objs += runtime/ksud_integration.o
+
+kernelsu-objs += selinux/selinux.o
+kernelsu-objs += selinux/rules.o
+kernelsu-objs += selinux/sepolicy.o
+
+kernelsu-objs += sulog/event.o
+kernelsu-objs += sulog/fd.o
+
+kernelsu-objs += supercall/dispatch.o
+kernelsu-objs += supercall/perm.o
+kernelsu-objs += supercall/supercall.o
+
+kernelsu-objs += feature/adb_root.o
+
+kernelsu-objs += feature/selinux_hide.o
+
+ifeq ($(CONFIG_KSU_KPROBES_SUSFS),y)
+kernelsu-objs += susfs/core.o
+kernelsu-objs += susfs/kstat.o
+kernelsu-objs += susfs/procfs.o
+
+# SUSFS is built against Android kernels that frequently backport individual
+# MM/VFS APIs without updating LINUX_VERSION_CODE. Probe the actual source
+# surface instead of assuming that a nominal kernel version has every API from
+# the matching upstream release.
+ifeq ($(shell grep -Eq \
+	'struct[[:space:]]+maple_tree[[:space:]]+mm_mt[[:space:]]*;' \
+	$(srctree)/include/linux/mm_types.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_MM_MT
+endif
+ifeq ($(shell grep -q "mmap_read_lock_killable" \
+	$(wildcard $(srctree)/include/linux/mmap_lock.h \
+		$(srctree)/include/linux/mm.h) \
+	2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_MMAP_LOCK
+endif
+ifeq ($(shell grep -q "down_read_killable" \
+	$(srctree)/include/linux/rwsem.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_DOWN_READ_KILLABLE
+endif
+ifeq ($(shell grep -q "mmget_not_zero" \
+	$(wildcard $(srctree)/include/linux/sched/mm.h \
+		$(srctree)/include/linux/sched.h) 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_MMGET_NOT_ZERO
+endif
+ifneq ($(wildcard $(srctree)/include/linux/sched/mm.h),)
+ccflags-y += -DKSU_SUSFS_HAS_SCHED_MM
+endif
+ifeq ($(shell grep -q "show_map_pad_vma" \
+	$(srctree)/include/linux/pgsize_migration.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_PGSIZE_MIGRATION
+endif
+ifeq ($(shell grep -Fq "struct vm_area_struct *pad" \
+	$(srctree)/include/linux/pgsize_migration.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_SHOW_MAP_PAD_VMA_HAS_PAD
+endif
+ifeq ($(shell grep -q "get_data_vma" \
+	$(srctree)/include/linux/pgsize_migration.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_PGSIZE_MIGRATION_VMA_ACCESSORS
+endif
+ifeq ($(shell grep -q "vma_get_anon_name" \
+	$(wildcard $(srctree)/include/linux/mm_types.h \
+		$(srctree)/include/linux/mm.h) \
+	2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_VMA_ANON_NAME
+endif
+ifeq ($(shell grep -F "get_user_pages_remote" \
+	$(srctree)/include/linux/mm.h 2>/dev/null | \
+	grep -Fq "struct task_struct"; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_GUP_REMOTE_HAS_TASK
+endif
+ifeq ($(shell grep -Fq 'struct vm_area_struct **vmas' \
+	$(srctree)/include/linux/mm.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_GUP_REMOTE_HAS_VMAS
+endif
+ifeq ($(shell grep -Fq "**vmas, int *locked" \
+	$(srctree)/include/linux/mm.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_GUP_REMOTE_HAS_LOCKED
+endif
+ifeq ($(shell grep -q "page_is_young" \
+	$(srctree)/include/linux/page_idle.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_PAGE_IDLE
+endif
+ifeq ($(shell grep -q "xa_is_value" \
+	$(srctree)/include/linux/xarray.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_XA_IS_VALUE
+endif
+ifeq ($(shell grep -q "seq_put_hex_ll" \
+	$(srctree)/include/linux/seq_file.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_SEQ_PUT_HEX_LL
+endif
+ifeq ($(shell grep -q "seq_put_decimal_ull_width" \
+	$(srctree)/include/linux/seq_file.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_SEQ_PUT_DECIMAL_ULL_WIDTH
+endif
+ifeq ($(shell grep -Eq '[[:space:]]version[[:space:]]*;' \
+	$(srctree)/include/linux/seq_file.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_SEQ_FILE_HAS_VERSION
+endif
+ifeq ($(shell grep -q "struct mm_walk_ops" \
+	$(wildcard $(srctree)/include/linux/pagewalk.h \
+		$(srctree)/include/linux/mm.h) \
+	2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_MM_WALK_OPS
+endif
+ifeq ($(shell grep -Eq 'int[[:space:]]+depth,[[:space:]]*struct[[:space:]]+mm_walk' \
+	$(wildcard $(srctree)/include/linux/pagewalk.h \
+		$(srctree)/include/linux/mm.h) \
+	2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_PTE_HOLE_HAS_DEPTH
+endif
+ifeq ($(shell grep -q "compound_nr" \
+	$(srctree)/include/linux/mm.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_COMPOUND_NR
+endif
+ifeq ($(shell grep -q "hugetlb_pmd_shared" \
+	$(srctree)/include/linux/hugetlb.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_HUGETLB_PMD_SHARED
+endif
+ifeq ($(shell grep -q "is_device_private_entry" \
+	$(srctree)/include/linux/swapops.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_DEVICE_PRIVATE_ENTRY
+endif
+ifeq ($(shell grep -q "pfn_swap_entry_to_page" \
+	$(srctree)/include/linux/swapops.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_PFN_SWAP_ENTRY_TO_PAGE
+endif
+ifeq ($(shell grep -q "is_pfn_swap_entry" \
+	$(srctree)/include/linux/swapops.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_IS_PFN_SWAP_ENTRY
+endif
+ifeq ($(shell grep -q "migration_entry_to_page" \
+	$(srctree)/include/linux/swapops.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_MIGRATION_ENTRY_TO_PAGE
+endif
+ifeq ($(shell grep -q "device_private_entry_to_page" \
+	$(srctree)/include/linux/swapops.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_DEVICE_PRIVATE_ENTRY_TO_PAGE
+endif
+ifeq ($(shell grep -q "xa_load" \
+	$(srctree)/include/linux/xarray.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_XA_LOAD
+endif
+ifeq ($(shell grep -q "find_get_entry" \
+	$(srctree)/include/linux/pagemap.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_FIND_GET_ENTRY
+endif
+ifeq ($(shell grep -q "files_lookup_fd_locked" \
+	$(srctree)/include/linux/fdtable.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_FILES_LOOKUP_FD_LOCKED
+endif
+ifeq ($(shell grep -q "files_lookup_fd_raw" \
+	$(srctree)/include/linux/fdtable.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_FILES_LOOKUP_FD_RAW
+endif
+ifneq ($(wildcard $(srctree)/include/linux/generic-radix-tree.h),)
+ccflags-y += -DKSU_SUSFS_HAS_GENERIC_RADIX_TREE
+endif
+ifeq ($(shell grep -q "proc_pid_smaps_rollup_operations" \
+	$(srctree)/fs/proc/internal.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_SMAPS_ROLLUP
+endif
+ifeq ($(shell grep -E '[*]getattr[^_[:alnum:]]' \
+	$(srctree)/include/linux/fs.h 2>/dev/null | \
+	grep -Fq "struct path"; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_PATH_GETATTR
+endif
+ifeq ($(shell grep -Eq '[*]iterate_shared[^_[:alnum:]]' \
+	$(srctree)/include/linux/fs.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_ITERATE_SHARED
+endif
+ifeq ($(shell grep -Eq '[*]iterate[^_[:alnum:]]' \
+	$(srctree)/include/linux/fs.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_SUSFS_HAS_ITERATE
+endif
+endif
+
+ifeq ($(CONFIG_KSU_KPROBES_NOMOUNT),y)
+kernelsu-objs += nomount/core.o
+kernelsu-objs += nomount/hooks.o
+kernelsu-objs += nomount/netlink.o
+
+ifeq ($(shell sed -n '/^int iterate_dir/,/^}/p' \
+	$(srctree)/fs/readdir.c 2>/dev/null | \
+	grep -Fq 'if (!file->f_op->iterate_shared)'; echo $$?),0)
+ccflags-y += -DKSU_NOMOUNT_ITERATE_SHARED_ONLY
+endif
+
+ifeq ($(shell sed -n '/^struct genl_family {/,/^};/p' \
+	$(srctree)/include/net/genetlink.h 2>/dev/null | \
+	grep -Eq 'nla_policy[[:space:]]+[*][[:space:]]*policy'; echo $$?),0)
+ccflags-y += -DKSU_NOMOUNT_GENL_FAMILY_HAS_POLICY
+endif
+ifeq ($(shell sed -n '/^struct genl_ops {/,/^};/p' \
+	$(srctree)/include/net/genetlink.h 2>/dev/null | \
+	grep -Eq 'nla_policy[[:space:]]+[*][[:space:]]*policy'; echo $$?),0)
+ccflags-y += -DKSU_NOMOUNT_GENL_OPS_HAS_POLICY
+endif
+ifeq ($(shell sed -n '/^struct genl_family {/,/^};/p' \
+	$(srctree)/include/net/genetlink.h 2>/dev/null | \
+	grep -Eq 'netnsok[[:space:]]*;'; echo $$?),0)
+ccflags-y += -DKSU_NOMOUNT_GENL_FAMILY_HAS_NETNSOK
+endif
+ifeq ($(shell sed -n '/^struct genl_family {/,/^};/p' \
+	$(srctree)/include/net/genetlink.h 2>/dev/null | \
+	grep -Eq 'module[[:space:]]*;'; echo $$?),0)
+ccflags-y += -DKSU_NOMOUNT_GENL_FAMILY_HAS_MODULE
+endif
+ifeq ($(shell sed -n '/^struct genl_family {/,/^};/p' \
+	$(srctree)/include/net/genetlink.h 2>/dev/null | \
+	grep -Eq 'genl_ops[[:space:]]+[*][[:space:]]*ops'; echo $$?),0)
+ccflags-y += -DKSU_NOMOUNT_GENL_FAMILY_HAS_OPS
+endif
+ifeq ($(shell grep -Eq 'genl_register_family_with_ops' \
+	$(srctree)/include/net/genetlink.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_NOMOUNT_HAS_GENL_REGISTER_FAMILY_WITH_OPS
+endif
+endif
+
+ifdef KBUILD_EXTMOD
+ifeq ($(CONFIG_KSU_DISABLE_MANAGER),y)
+ccflags-y += -DCONFIG_KSU_DISABLE_MANAGER=1
+endif
+ifeq ($(CONFIG_KSU_DISABLE_POLICY),y)
+ccflags-y += -DCONFIG_KSU_DISABLE_POLICY=1
+endif
+ifeq ($(CONFIG_KSU_DEBUG),y)
+ccflags-y += -DCONFIG_KSU_DEBUG=1
+endif
+endif
+
+ccflags-y += -I$(srctree)/security/selinux -I$(srctree)/security/selinux/include
+ccflags-y += -I$(objtree)/security/selinux -include $(srctree)/include/uapi/asm-generic/errno.h
+ccflags-y += -I$(srctree)/fs
+
+ifeq ($(filter /%,$(src)),)
+KSU_KERNEL_DIR := $(srctree)/$(src)
+else
+KSU_KERNEL_DIR := $(src)
+endif
+
+ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include
+
+obj-$(CONFIG_KSU) += kernelsu.o
+
+LPATH := /usr/bin/env PATH="$$PATH":/usr/bin:/usr/local/bin
+KSU_MAKEFILE := $(lastword $(MAKEFILE_LIST))
+KSU_MAKEFILE_REAL := $(realpath $(KSU_MAKEFILE))
+ifneq ($(KSU_MAKEFILE_REAL),)
+MDIR := $(dir $(KSU_MAKEFILE_REAL))
+else
+MDIR := $(dir $(abspath $(KSU_MAKEFILE)))
+endif
+KSU_VERSION_FILE := $(MDIR)/.ksu_git_version
+
+# Bazel/Kleaf sandboxes may flatten the KernelSU-Next symlink and omit .git.
+# kernel/setup.sh refreshes this stamp automatically so those builds keep the
+# real manager-facing version.
+ifneq ($(wildcard $(KSU_VERSION_FILE)),)
+KSU_GIT_VERSION := $(shell sed -n '1p' $(KSU_VERSION_FILE))
+KSU_GIT_TAG := $(shell sed -n '2p' $(KSU_VERSION_FILE))
+ifneq ($(KSU_GIT_VERSION),)
+KSU_GIT_VERSION_VALID := 1
+$(info -- KernelSU-Next version stamp detected at: $(KSU_VERSION_FILE))
+endif
+else
+# Check if this is a git repository and only use it when it is separate from the kernel.
+GIT_ROOT := $(shell cd $(MDIR) && $(LPATH) git rev-parse --show-toplevel 2>/dev/null)
+ifneq ($(GIT_ROOT),)
+KERNEL_GIT_ROOT := $(shell cd $(srctree) && $(LPATH) git rev-parse --show-toplevel 2>/dev/null)
+ifneq ($(GIT_ROOT),$(KERNEL_GIT_ROOT))
+# Only set version if it's a different repo from kernel
+$(shell cd $(GIT_ROOT) && [ -f .git/shallow ] && $(LPATH) git fetch --unshallow 2>/dev/null || true)
+KSU_GIT_VERSION := $(shell cd $(GIT_ROOT) && $(LPATH) git rev-list --count HEAD 2>/dev/null)
+KSU_GIT_TAG := $(shell cd $(GIT_ROOT) && $(LPATH) git describe --tags --abbrev=0 2>/dev/null)
+ifneq ($(KSU_GIT_VERSION),)
+KSU_GIT_VERSION_VALID := 1
+$(info -- KernelSU-Next Git repo detected at: $(GIT_ROOT))
+endif
+endif
+endif
+endif
+
+KSU_GIT_VERSION := $(strip $(KSU_GIT_VERSION))
+KSU_GIT_TAG := $(strip $(KSU_GIT_TAG))
+
+# Calculate version if git version is available
+ifdef KSU_GIT_VERSION_VALID
+# ksu_version: major * 30000 + git version for historical reasons
+$(eval KSU_VERSION=$(shell expr 30000 + $(KSU_GIT_VERSION)))
+$(info -- KernelSU-Next version: $(KSU_VERSION))
+ccflags-y += -DKSU_VERSION=$(KSU_VERSION)
+else
+# If there is no .git directory, use default version
+$(warning "KSU_GIT_VERSION not defined! Run kernel/setup.sh or make KernelSU-Next a git repository!")
+KSU_VERSION_FALLBACK := 1
+$(info -- KernelSU-Next version fallback: $(KSU_VERSION_FALLBACK))
+ccflags-y += -DKSU_VERSION=$(KSU_VERSION_FALLBACK)
+endif
+
+ifneq ($(KSU_GIT_TAG),)
+$(eval KSU_VERSION_TAG=$(KSU_GIT_TAG))
+$(info -- KernelSU-Next tag: $(KSU_VERSION_TAG))
+ccflags-y += -DKSU_VERSION_TAG=\"$(KSU_VERSION_TAG)\"
+else
+$(warning "KSU_VERSION_TAG not defined! Run kernel/setup.sh or fetch KernelSU-Next tags/provide a version stamp!")
+KSU_VERSION_TAG_FALLBACK := v0.0.1
+$(info -- KernelSU-Next tag fallback: $(KSU_VERSION_TAG_FALLBACK))
+ccflags-y += -DKSU_VERSION_TAG=\"$(KSU_VERSION_TAG_FALLBACK)\"
+endif
+
+KSU_NEW_DCACHE_FLUSH := $(shell grep -q __flush_dcache_area $(srctree)/arch/arm64/include/asm/cacheflush.h ; echo $$?)
+$(info -- KernelSU-Next new DCACHE flush: $(KSU_NEW_DCACHE_FLUSH))
+
+# SELinux drivers check
+ifeq ($(shell grep -q "current_sid(void)" $(srctree)/security/selinux/include/objsec.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_CURRENT_SID
+endif
+ifeq ($(shell grep -q "struct selinux_state " $(srctree)/security/selinux/include/security.h; echo $$?),0)
+$(info -- $(REPO_NAME)/compat: selinux_state found)
+ccflags-y += -DKSU_COMPAT_USE_SELINUX_STATE
+endif
+
+# Handle optional backports
+ifeq ($(shell grep -q "strncpy_from_user_nofault" $(srctree)/include/linux/uaccess.h; echo $$?),0)
+ccflags-y += -DKSU_OPTIONAL_STRNCPY
+endif
+
+ifeq ($(shell grep -q "ssize_t kernel_read" $(srctree)/fs/read_write.c; echo $$?),0)
+ccflags-y += -DKSU_OPTIONAL_KERNEL_READ
+endif
+
+ifeq ($(shell grep "ssize_t kernel_write" $(srctree)/fs/read_write.c | grep -q "const void" ; echo $$?),0)
+ccflags-y += -DKSU_OPTIONAL_KERNEL_WRITE
+endif
+
+ifeq ($(shell grep -q "int\s\+path_umount" $(srctree)/fs/namespace.c; echo $$?),0)
+ccflags-y += -DKSU_HAS_PATH_UMOUNT
+endif
+
+# Some Android kernels backport faccessat2-style flags into do_faccessat()
+# without matching upstream version numbers.
+ifeq ($(shell grep -F "long do_faccessat" \
+	$(srctree)/fs/open.c 2>/dev/null | \
+	grep -Fq "flags"; echo $$?),0)
+ccflags-y += -DKSU_HAS_FACCESSAT2
+endif
+
+# seccomp_types.h was added in 6.7
+ifeq ($(shell grep -q "atomic_t\s\+filter_count" $(srctree)/include/linux/seccomp.h $(srctree)/include/linux/seccomp_types.h; echo $$?),0)
+ccflags-y += -DKSU_OPTIONAL_SECCOMP_FILTER_CNT
+endif
+
+# some old kernels backport this, so check whether put_seccomp_filter still exists
+ifneq ($(shell grep -wq "put_seccomp_filter" $(srctree)/kernel/seccomp.c $(srctree)/include/linux/seccomp.h; echo $$?),0)
+ccflags-y += -DKSU_OPTIONAL_SECCOMP_FILTER_RELEASE
+endif
+
+# Checks Samsung
+ifeq ($(shell grep -q "CONFIG_KDP_CRED" $(srctree)/kernel/cred.c; echo $$?),0)
+ccflags-y += -DSAMSUNG_UH_DRIVER_EXIST
+endif
+
+ifeq ($(shell grep -q "SEC_SELINUX_PORTING_COMMON" $(srctree)/security/selinux/avc.c; echo $$?),0)
+ccflags-y += -DSAMSUNG_SELINUX_PORTING
+endif
+
+# policy mutex
+# kernel 5.10+
+ifeq ($(shell grep -q "policy_mutex" $(srctree)/security/selinux/include/security.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_POLICY_MUTEX
+endif
+
+# Android SPEC Changes
+# https://android-review.googlesource.com/c/kernel/common/+/3009995
+ifeq ($(shell grep -q "POLICYDB_CONFIG_ANDROID_NETLINK_ROUTE" $(srctree)/security/selinux/ss/policydb.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_POLICYDB_CONFIG_ANDROID_NETLINK_ROUTE
+endif
+
+ifeq ($(shell grep -q "POLICYDB_CONFIG_ANDROID_NETLINK_GETNEIGH" $(srctree)/security/selinux/ss/policydb.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_POLICYDB_CONFIG_ANDROID_NETLINK_GETNEIGH
+endif
+
+ifneq ($(shell grep -q "flex_array" $(srctree)/security/selinux/ss/policydb.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_MODERN_POLICYDB
+endif
+
+ifeq ($(shell grep -F -q "int (*setprocattr)(const char *name, void *value, size_t size);" $(srctree)/include/linux/lsm_hooks.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_SETPROCATTR_USE_NEW_PROTOTYPE
+endif
+
+ifeq ($(shell grep -F -q "char *lsm_names" $(srctree)/security/security.c; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_REQUIRE_PROVIDE_LSM_NAME
+endif
+
+# https://github.com/torvalds/linux/commit/4b36cb773a8153417a080f8025d522322f915aea
+ifeq ($(shell grep -q "struct mutex status_lock" $(srctree)/security/selinux/include/security.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_SELINUX_STATUS_VAR_IN_SELINUX_STATE
+endif
+
+ifeq ($(shell grep -q "struct selinux_policy" $(srctree)/security/selinux/ss/services.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_SELINUX_POLICY_STRUCT
+endif
+
+# https://github.com/torvalds/linux/commit/24def7bb92c19337cee26d506f87dc4eeeba7a19
+ifeq ($(shell grep -q "hashtab_key_params" $(srctree)/security/selinux/ss/hashtab.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_HASHTAB_KEY_PARAMS
+endif
+
+# https://github.com/torvalds/linux/commit/c3a276111ea2572399281988b3129683e2a6b60b
+ifeq ($(shell grep -q "filename_trans_key" $(srctree)/security/selinux/ss/policydb.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_FILENAME_TRANS_KEY
+endif
+
+
+ifndef KSU_NEXT_MANAGER_SIZE
+KSU_NEXT_MANAGER_SIZE := 0x3e6
+endif
+
+ifndef KSU_NEXT_MANAGER_HASH
+KSU_NEXT_MANAGER_HASH := 79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7
+endif
+
+ifdef KSU_MANAGER_PACKAGE
+ccflags-y += -DKSU_MANAGER_PACKAGE=\"$(KSU_MANAGER_PACKAGE)\"
+$(info -- KernelSU-Next Manager package name: $(KSU_MANAGER_PACKAGE))
+endif
+
+$(info -- KernelSU-Next Manager signature size: $(KSU_NEXT_MANAGER_SIZE))
+$(info -- KernelSU-Next Manager signature hash: $(KSU_NEXT_MANAGER_HASH))
+
+ccflags-y += -DEXPECTED_MANAGER_SIZE=$(KSU_NEXT_MANAGER_SIZE)
+ccflags-y += -DEXPECTED_MANAGER_HASH=\"$(KSU_NEXT_MANAGER_HASH)\"
+
+ccflags-y += -DKSU_NEW_DCACHE_FLUSH=$(KSU_NEW_DCACHE_FLUSH)
+
+ccflags-y += -Wno-strict-prototypes -Wno-int-conversion -Wno-gcc-compat -Wno-missing-prototypes
+ccflags-y += -Wno-declaration-after-statement -Wno-unused-function -Wno-unused-variable
+
+# Keep a new line here!! Because someone may append config
