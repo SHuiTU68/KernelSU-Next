@@ -59,14 +59,15 @@ config KSU_KFPROBE_HOOK
 	default n
 	help
 	  KFprobe (Kernel Function Probe) is a hybrid kprobe/kretprobe hook
-	  engine for intercepting kernel VFS/core functions (e.g.
-	  do_execveat_common, do_faccessat, vfs_statx).
+	  engine built into the kernel image for intercepting kernel VFS/core
+	  functions (e.g. do_execveat_common, do_faccessat, vfs_statx).
 	  Features:
 	    - Address-based kprobe registration (no /proc/kallsyms leak)
 	    - Three-layer static-key gate (global + per-feature + per-task)
 	    - Optional kretprobe for return-value interception
 	    - Root-powered symbol resolution via kallsyms_lookup_name
 	    - Zero hot-path allocations, zero hot-path logging
+	  Select Y to compile KFprobe into the kernel image.
 	  If unsure, say N.
 
 menu "KernelSU - SUSFS"
