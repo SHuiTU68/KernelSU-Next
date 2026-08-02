@@ -2,7 +2,7 @@ menu "KernelSU"
 
 config KSU
 	tristate "KernelSU function support"
-	depends on KPROBES || SUSFS
+	depends on KPROBES || KSU_SUSFS
 	default y
 	help
 	  Enable kernel-level root privileges on Android System.
@@ -56,6 +56,7 @@ config KSU_X86_PATCH_SYSCALL_DISPATCHER
 config KSU_KFPROBE_HOOK
 	bool "KFprobe: kernel function probe hook engine"
 	depends on KSU && KPROBES && KALLSYMS && NET
+	depends on !KSU_SUSFS
 	select KSU_NOMOUNT
 	default n
 	help
@@ -77,6 +78,7 @@ config KSU_SUSFS
 	bool "KernelSU addon - SUSFS"
 	depends on KSU
 	depends on THREAD_INFO_IN_TASK
+	depends on !KSU_KFPROBE_HOOK
 	default y
 	help
 	  Patch and Enable SUSFS to kernel with KernelSU.
