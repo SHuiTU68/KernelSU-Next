@@ -70,6 +70,26 @@ config KSU_KFPROBE_HOOK
 	  Select Y to compile KFprobe into the kernel image.
 	  If unsure, say N.
 
+config KSU_NOMOUNT
+	bool "NoMount: VFS path redirection and virtual file injection engine"
+	depends on KSU
+	default n
+	help
+	  NoMount provides VFS-layer path redirection and virtual file injection
+	  without mounting filesystems. It enables systemless modifications by
+	  intercepting VFS operations (lookup, iterate_dir, statfs, etc.) at the
+	  inode/dentry/superblock level.
+	  Features:
+	    - Virtual file/directory injection into any existing directory
+	    - Path redirection (redirect access to a different real path)
+	    - Whiteout support (hide files/directories)
+	    - Per-UID blocking (block specific UIDs from seeing injected entries)
+	    - Generic Netlink API for userspace management
+	    - Bloom-filter accelerated child lookup
+	    - Automatic virtual topology generation for non-existent paths
+	  Select Y to compile NoMount into the kernel image.
+	  If unsure, say N.
+
 menu "KernelSU - SUSFS"
 config KSU_SUSFS
 	bool "KernelSU addon - SUSFS"
