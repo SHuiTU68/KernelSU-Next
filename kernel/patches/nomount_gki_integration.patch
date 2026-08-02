@@ -1,0 +1,49 @@
+From: maxsteeelFrom: maxsteeel <maxsteeel@nomount.dev>
+Date: Sat, 2 Aug 2026From: maxsteeel <maxsteeel@nomount.dev>
+Date: Sat, 2 Aug 2026 00:00:00 +0800
+Subject: [PATCH] nomount: add NoMount path redirection subsystem
+
+NoMount allows path redirection and virtual file injection
+without mounting filesFrom: maxsteeel <maxsteeel@nomount.dev>
+Date: Sat, 2 Aug 2026 00:00:00 +0800
+Subject: [PATCH] nomount: add NoMount path redirection subsystem
+
+NoMount allows path redirection and virtual file injection
+without mounting filesystems. It intercepts VFS operations
+at the inode/dentry/superblock level to provide systemless
+modifications.
+
+Signed-off-by: maxsteeel <maxsteeelFrom: maxsteeel <maxsteeel@nomount.dev>
+Date: Sat, 2 Aug 2026 00:00:00 +0800
+Subject: [PATCH] nomount: add NoMount path redirection subsystem
+
+NoMount allows path redirection and virtual file injection
+without mounting filesystems. It intercepts VFS operations
+at the inode/dentry/superblock level to provide systemless
+modifications.
+
+Signed-off-by: maxsteeel <maxsteeel@nomount.dev>
+---
+ fs/Kconfig  | 7 +++++++
+ fs/Makefile | 2 ++
+ 2 files changed, 9 insertions(+)
+
+diff --From: maxsteeel <maxsteeel@nomount.dev>
+Date: Sat, 2 Aug 2026 00:00:00 +0800
+Subject: [PATCH] nomount: add NoMount path redirection subsystem
+
+NoMount allows path redirection and virtual file injection
+without mounting filesystems. It intercepts VFS operations
+at the inode/dentry/superblock level to provide systemless
+modifications.
+
+Signed-off-by: maxsteeel <maxsteeel@nomount.dev>
+---
+ fs/Kconfig  | 7 +++++++
+ fs/Makefile | 2 ++
+ 2 files changed, 9 insertions(+)
+
+diff --git a/fs/Kconfig b/fs/Kconfig
+index 1c1ed36c..8fb40ecc 100644
+--- a/fs/Kconfig
++++

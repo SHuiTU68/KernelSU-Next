@@ -1,0 +1,15 @@
+config NOMOUNT
+	bool "NoMount Path Redirection Subsystem"
+	default y
+	help
+	  NoMount allows path redirection and virtual file injection
+	  without mounting filesystems. Useful for systemless modifications.
+	  
+	  Features:
+	    - Virtual file/directory injection into any existing directory
+	    - Path redirection (redirect access to a different real path)
+	    - Whiteout support (hide files/directories)
+	    - Per-UID blocking (block specific UIDs from seeing injected entries)
+	    - Generic Netlink API for userspace management
+	    - Bloom-filter accelerated child lookup
+	    - Automatic virtual topology generation for non-existent paths
