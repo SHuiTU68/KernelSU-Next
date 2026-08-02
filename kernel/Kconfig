@@ -56,7 +56,6 @@ config KSU_X86_PATCH_SYSCALL_DISPATCHER
 config KSU_KFPROBE_HOOK
 	bool "KFprobe: kernel function probe hook engine"
 	depends on KSU && KPROBES && KALLSYMS && NET
-	depends on !KSU_SUSFS
 	select KSU_NOMOUNT
 	default n
 	help
@@ -78,7 +77,6 @@ config KSU_SUSFS
 	bool "KernelSU addon - SUSFS"
 	depends on KSU
 	depends on THREAD_INFO_IN_TASK
-	depends on !KSU_KFPROBE_HOOK
 	default y
 	help
 	  Patch and Enable SUSFS to kernel with KernelSU.
@@ -86,6 +84,7 @@ config KSU_SUSFS
 config KSU_SUSFS_SUS_PATH
 	bool "Enable to hide suspicious path"
 	depends on KSU_SUSFS
+	depends on !KSU_KFPROBE_HOOK
 	default y
 	help
 	  - Allow hiding the user-defined path and all its sub-paths from various system calls.
@@ -97,6 +96,7 @@ config KSU_SUSFS_SUS_PATH
 config KSU_SUSFS_SUS_MOUNT
 	bool "Enable to hide suspicious mounts"
 	depends on KSU_SUSFS
+	depends on !KSU_KFPROBE_HOOK
 	default y
 	help
 	  - Automatically assign fake mnt_id and fake mnt_group_id for mounts mounted by ksu process until /sdcard is  decrypted, this is to evade from mnt_id/mnt_group_id gap detections.
@@ -105,6 +105,7 @@ config KSU_SUSFS_SUS_MOUNT
 config KSU_SUSFS_SUS_KSTAT
 	bool "Enable to spoof suspicious kstat"
 	depends on KSU_SUSFS
+	depends on !KSU_KFPROBE_HOOK
 	default y
 	help
 	  - Allow spoofing the kstat of user-defined file/directory.
@@ -144,6 +145,7 @@ config KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
 config KSU_SUSFS_OPEN_REDIRECT
 	bool "Enable to redirect a path to be opened with another path"
 	depends on KSU_SUSFS
+	depends on !KSU_KFPROBE_HOOK
 	default y
 	help
 	  - Allow redirecting a target path to be opened with another user-defined path.
@@ -155,6 +157,7 @@ config KSU_SUSFS_OPEN_REDIRECT
 config KSU_SUSFS_SUS_MAP
 	bool "Enable to hide some mmapped real file from different proc maps interfaces"
 	depends on KSU_SUSFS
+	depends on !KSU_KFPROBE_HOOK
 	default y
 	help
 	  - Allow hiding mmapped real file from /proc/<pid>/[maps|smaps|smaps_rollup|map_files|mem|pagemap]

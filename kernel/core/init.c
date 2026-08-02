@@ -145,7 +145,7 @@ int __init kernelsu_init(void)
 
 	ksu_init_symbol_resolver();
 
-#if !defined(CONFIG_KSU_SUSFS) && defined(CONFIG_KPROBES)
+#if !defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_KSU_KFPROBE_HOOK) && defined(CONFIG_KPROBES)
 	ksu_syscall_hook_init();
 #endif
 
@@ -153,10 +153,8 @@ int __init kernelsu_init(void)
 
 	ksu_sulog_init();
 
-#ifndef CONFIG_KSU_SUSFS
-#ifdef CONFIG_KPROBES
+#if !defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_KSU_KFPROBE_HOOK) && defined(CONFIG_KPROBES)
 	ksu_lsm_hook_init();
-#endif
 #endif
 
 #ifdef CONFIG_KSU_KFPROBE_HOOK
@@ -174,7 +172,7 @@ ksu_selinux_hide_init();
 
 	ksu_supercalls_init();
 
-#ifdef CONFIG_KSU_SUSFS
+#if defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_KSU_KFPROBE_HOOK)
 	ksu_sucompat_init();
 	ksu_setuid_hook_init();
 	ksu_avc_spoof_init();
@@ -195,7 +193,7 @@ ksu_selinux_hide_init();
 		ksu_allowlist_init();
 		ksu_load_allow_list();
 
-#if !defined(CONFIG_KSU_SUSFS) && defined(CONFIG_KPROBES)
+#if !defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_KSU_KFPROBE_HOOK) && defined(CONFIG_KPROBES)
 		ksu_syscall_hook_manager_init();
 #endif
 
@@ -206,7 +204,7 @@ ksu_selinux_hide_init();
 		ksu_boot_completed = true;
 		track_throne(false);
 
-		#ifdef CONFIG_KSU_SUSFS
+		#if defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_KSU_KFPROBE_HOOK)
 		ksu_avc_spoof_late_init();
 		#endif
 		ksu_selinux_hide_drop_backup_if_unused();
@@ -217,7 +215,7 @@ ksu_selinux_hide_init();
 		}
 
 	} else {
-#if !defined(CONFIG_KSU_SUSFS) && defined(CONFIG_KPROBES)
+#if !defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_KSU_KFPROBE_HOOK) && defined(CONFIG_KPROBES)
 		ksu_syscall_hook_manager_init();
 #endif
 
@@ -241,7 +239,7 @@ ksu_selinux_hide_init();
 void __exit kernelsu_exit(void)
 {
 	// Phase 1: Stop all hooks first to prevent new callbacks
-#if !defined(CONFIG_KSU_SUSFS) && defined(CONFIG_KPROBES)
+#if !defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_KSU_KFPROBE_HOOK) && defined(CONFIG_KPROBES)
 	ksu_syscall_hook_manager_exit();
 #endif
 
@@ -260,7 +258,7 @@ void __exit kernelsu_exit(void)
 
 	ksu_allowlist_exit();
 
-#ifdef CONFIG_KSU_SUSFS
+#if defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_KSU_KFPROBE_HOOK)
 	ksu_avc_spoof_exit();
 	ksu_sucompat_exit();
 	ksu_setuid_hook_exit();
@@ -268,10 +266,8 @@ void __exit kernelsu_exit(void)
 
 	ksu_selinux_hide_exit();
 
-#ifndef CONFIG_KSU_SUSFS
-#ifdef CONFIG_KPROBES
+#if !defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_KSU_KFPROBE_HOOK) && defined(CONFIG_KPROBES)
 	ksu_lsm_hook_exit();
-#endif
 #endif
 
 #ifdef CONFIG_KSU_KFPROBE_HOOK
