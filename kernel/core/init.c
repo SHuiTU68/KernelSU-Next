@@ -98,9 +98,9 @@ module_param_named(norc, ksu_no_custom_rc, bool, 0);
 
 int __init kernelsu_init(void)
 {
-#ifdef CONFIG_KSU_SUSFS
+#if defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_KSU_KFPROBE_HOOK)
 	susfs_init();
-#endif // #ifdef KSU_SUSFS
+#endif
 
 #if defined(__x86_64__) && !defined(CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER)
     // If the kernel has the hardening patch, X86_FEATURE_INDIRECT_SAFE must be set
