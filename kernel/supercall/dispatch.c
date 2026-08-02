@@ -736,7 +736,9 @@ static int do_get_hook_mode(void __user *arg)
 {
     struct ksu_get_hook_mode_cmd cmd = {0};
 
-#ifndef CONFIG_KSU_SUSFS
+#ifdef CONFIG_KSU_KFPROBE_HOOK
+    strscpy(cmd.mode, "KFprobe", sizeof(cmd.mode));
+#elif !defined(CONFIG_KSU_SUSFS)
 #ifdef CONFIG_HAVE_SYSCALL_TRACEPOINTS
     strscpy(cmd.mode, "Tracepoint", sizeof(cmd.mode));
 #else
