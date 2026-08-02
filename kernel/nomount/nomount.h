@@ -17,6 +17,11 @@
 #endif
 #include <linux/jump_label.h>
 
+/* Static key: fast zero-overhead path when no rules are active */
+DECLARE_STATIC_KEY_FALSE(nomount_active_rules);
+/* Static key: fast zero-overhead path when no UIDs are blocked */
+DECLARE_STATIC_KEY_FALSE(nomount_active_uids);
+
 #define NM_MODULE_VERSION "12"
 #define NOMOUNT_VERSION    12
 #define NOMOUNT_HASH_BITS  12

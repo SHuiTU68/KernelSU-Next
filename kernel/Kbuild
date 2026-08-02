@@ -15,6 +15,7 @@ ifeq ($(strip $(CONFIG_KPROBES)),y)
 kernelsu-objs += hook/lsm_hook.o
 ifeq ($(strip $(CONFIG_KSU_KFPROBE_HOOK)),y)
 kernelsu-objs += hook/kfprobe_hook.o
+kernelsu-objs += hook/kfprobe_lsm.o
 endif
 ifdef KSU_ARCH
 kernelsu-objs += hook/$(KSU_ARCH)/patch_memory.o
@@ -65,6 +66,10 @@ kernelsu-objs += sulog/fd.o
 kernelsu-objs += supercall/dispatch.o
 kernelsu-objs += supercall/perm.o
 kernelsu-objs += supercall/supercall.o
+
+ifeq ($(strip $(CONFIG_KSU_NOMOUNT)),y)
+kernelsu-objs += nomount/nomount.o
+endif
 
 kernelsu-objs += feature/adb_root.o
 

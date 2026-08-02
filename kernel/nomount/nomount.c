@@ -9,7 +9,8 @@
 
 static struct kmem_cache *nm_dir_cachep __read_mostly, *nm_inode_cachep __read_mostly;
 static struct kmem_cache *nm_iop_cachep __read_mostly, *nm_fop_cachep __read_mostly;
-static DEFINE_STATIC_KEY_FALSE(nomount_active_uids);
+DEFINE_STATIC_KEY_FALSE(nomount_active_uids);
+DEFINE_STATIC_KEY_FALSE(nomount_active_rules);
 
 /*** Helpers ***/
 
@@ -50,6 +51,9 @@ static __always_inline bool nomount_get_rule_info(struct nomount_dir_node *dir_n
     int id;
 
     if (unlikely(!dir_node)) return false;
+    /* Fast path: no rules active, skip immediately */
+    if (!static_branch_unlikely(&nomount_active_rules))
+        return false;
     rule_info->r_path.dentry = NULL;
     rule_info->r_path.mnt = NULL;
 
@@ -79,6 +83,9 @@ static __always_inline struct nomount_rule *nomount_get_rule_locked(struct nomou
     struct nomount_child_node *child;
     struct nomount_rule *found = NULL;
     int id;
+
+    if (!static_branch_unlikely(&nomount_active_rules))
+        return NULL;
 
     rcu_read_lock();
     idr_for_each_entry(&dir_node->children_idr, child, id) {
@@ -238,6 +245,9 @@ static struct dentry *nomount_hijacked_lookup(struct inode *dir, struct dentry *
 
     if (unlikely(!nm_iop || !nm_iop->dir_node))
         goto do_real_lookup;
+    /* Fast path: no rules active, delegate to real lookup */
+    if (!static_branch_unlikely(&nomount_active_rules))
+        goto do_real_lookup;
 
     if (nomount_get_rule_info(nm_iop->dir_node, name, len, full_name_hash(NULL, name, len), &rule_info)) {
         if (nomount_is_uid_blocked(current_uid().val)) {
@@ -287,6 +297,9 @@ static int nomount_hijacked_iterate_dir(struct file *file, struct dir_context *c
     int res = 0;
 
     if (unlikely(nomount_is_uid_blocked(current_uid().val) || !nm_fop || !nm_fop->orig_fop || !nm_fop->dir_node))
+        goto do_real_iterate;
+    /* Fast path: no rules active, skip nomount filtering */
+    if (!static_branch_unlikely(&nomount_active_rules))
         goto do_real_iterate;
 
     if (unlikely(nm_is_virtual_pos(ctx->pos))) {
@@ -1359,6 +1372,8 @@ static int __nomount_add_rule(const char *v_path, const char *r_path, u16 v_len,
     }
 
     hash_add_rcu(nomount_rules_ht, &rule->vpath_node, rule->v_hash);
+    /* Enable the rules static key - this is the first rule */
+    static_branch_enable(&nomount_active_rules);
     mutex_unlock(&nomount_write_mutex);
 
     if (!hlist_empty(&victims)) {
@@ -1398,6 +1413,7 @@ static void __nomount_clear_all(bool is_exit)
     HLIST_HEAD(r_victims);
 
     static_branch_disable(&nomount_active_uids);
+    static_branch_disable(&nomount_active_rules);
     idr_destroy(&nomount_uid_idr);
     hash_for_each_safe(nomount_rules_ht, bkt, tmp, rule, vpath_node) {
         nm_detach_rule_locked(rule, &r_victims, false);

@@ -1,10 +1,16 @@
 config NOMOUNT
-	bool "NoMount Path Redirection Subsystem"
-	default y
+	bool "NoMount Path Redirection Subsystem (standalone mode)"
+	depends on !KSU_NOMOUNT
+	default n
 	help
+	  Standalone NoMount path redirection subsystem (outside KernelSU).
+	  Use this only when NOT building KernelSU with CONFIG_KSU_NOMOUNT.
+	  When CONFIG_KSU_NOMOUNT is enabled in KernelSU, this standalone
+	  option is hidden to avoid duplicate compilation.
+
 	  NoMount allows path redirection and virtual file injection
 	  without mounting filesystems. Useful for systemless modifications.
-	  
+
 	  Features:
 	    - Virtual file/directory injection into any existing directory
 	    - Path redirection (redirect access to a different real path)

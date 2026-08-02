@@ -55,7 +55,7 @@ config KSU_X86_PATCH_SYSCALL_DISPATCHER
 
 config KSU_KFPROBE_HOOK
 	bool "KFprobe: kernel function probe hook engine"
-	depends on KSU && KPROBES
+	depends on KSU && KPROBES && KALLSYMS
 	default n
 	help
 	  KFprobe (Kernel Function Probe) is a hybrid kprobe/kretprobe hook
@@ -159,6 +159,35 @@ config KSU_SUSFS_SUS_MAP
 	  - It may not be able to evade detections by apps that implement a good injection detection.
 	  - Effective only on zygote spawned umounted user app process >= 10000.
 
+endmenu
+
+menu "KernelSU - NoMount"
+config KSU_NOMOUNT
+	bool "KernelSU hookless NoMount path redirection engine"
+	depends on KSU
+	depends on NET
+	depends on KALLSYMS
+	default n
+	help
+	  Enable a KernelSU-hosted NoMount-compatible VFS redirection
+	  runtime. This keeps NoMount out of fs/ and uses VFS operation
+	  hijacking (i_op/f_op/s_op replacement) at the inode/dentry/
+	  superblock level to redirect paths and inject virtual files,
+	  while preserving the Generic Netlink family and command ABI
+	  used by the existing nm userspace tool.
+
+	  This implementation supports:
+	    - Virtual file/directory injection into any existing directory
+	    - Path redirection (redirect access to a different real path)
+	    - Whiteout support (hide files/directories)
+	    - Per-UID blocking (block specific UIDs from seeing injected entries)
+	    - Generic Netlink API for userspace management
+	    - Bloom-filter accelerated child lookup
+	    - Automatic virtual topology generation for non-existent paths
+	    - Static-key zero-overhead fast path when no rules are active
+
+	  Select Y to compile NoMount into the kernel image.
+	  If unsure, say N.
 endmenu
 
 endmenu

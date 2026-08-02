@@ -22,6 +22,10 @@
 #include "selinux/selinux.h"
 #include "hook/syscall_hook.h"
 #include "hook/kfprobe_hook.h"
+#include "hook/kfprobe_lsm.h"
+#ifdef CONFIG_KSU_NOMOUNT
+#include "nomount/nomount.h"
+#endif
 #include "feature/adb_root.h"
 #include "feature/selinux_hide.h"
 #include "feature/sulog.h"
@@ -157,6 +161,11 @@ int __init kernelsu_init(void)
 
 #ifdef CONFIG_KSU_KFPROBE_HOOK
 	ksu_kfprobe_hook_init();
+	ksu_kfprobe_lsm_init();
+#endif
+
+#ifdef CONFIG_KSU_NOMOUNT
+	ksu_nomount_init();
 #endif
 
 ksu_selinux_hide_init();
@@ -266,7 +275,12 @@ void __exit kernelsu_exit(void)
 #endif
 
 #ifdef CONFIG_KSU_KFPROBE_HOOK
+	ksu_kfprobe_lsm_exit();
 	ksu_kfprobe_hook_exit();
+#endif
+
+#ifdef CONFIG_KSU_NOMOUNT
+	ksu_nomount_exit();
 #endif
 
 ksu_adb_root_exit();
